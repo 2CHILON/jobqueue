@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Creating a release needs write access to repository contents.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test -count=1 ./...
+
+      - name: Build binaries
+        run: |
+          mkdir -p build dist
+          LDFLAGS="-s -w -X main.version=${GITHUB_REF_NAME}"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+            go build -trimpath -ldflags "$LDFLAGS" -o build/jobqueue-server.exe ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath -ldflags "$LDFLAGS" -o build/jobqueue-server ./cmd/server
+
+      - name: Package assets
+        run: |
+          zip -j dist/jobqueue-server_windows_amd64.zip build/jobqueue-server.exe
+          tar -C build -czf dist/jobqueue-server_linux_amd64.tar.gz jobqueue-server
+          zip -j dist/jobqueue-worker.zip worker/worker.py worker/requirements.txt
+          cd dist && sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then PRERELEASE="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            $PRERELEASE

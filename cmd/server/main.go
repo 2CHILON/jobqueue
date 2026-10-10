@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,8 +15,17 @@ import (
 	"github.com/2CHILON/jobqueue/internal/api"
 	"github.com/2CHILON/jobqueue/internal/store"
 )
+// version is set at build time: -ldflags "-X main.version=v1.2.3"
+var version = "dev"
 
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+
 	addr := ":" + getEnv("PORT", "8080")
 
 	st, err := store.OpenSQLite(getEnv("DB_PATH", "jobqueue.db"))
@@ -35,7 +46,7 @@ func main() {
 
 	// Run the server in a goroutine so main can wait for a shutdown signal.
 	go func() {
-		log.Printf("jobqueue listening on %s", addr)
+		log.Printf("jobqueue %s listening on %s", version, addr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server error: %v", err)
 		}
