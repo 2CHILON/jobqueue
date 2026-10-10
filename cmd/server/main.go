@@ -15,6 +15,7 @@ import (
 	"github.com/2CHILON/jobqueue/internal/api"
 	"github.com/2CHILON/jobqueue/internal/store"
 )
+
 // version is set at build time: -ldflags "-X main.version=v1.2.3"
 var version = "dev"
 
