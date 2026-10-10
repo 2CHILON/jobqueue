@@ -17,7 +17,11 @@ import (
 func main() {
 	addr := ":" + getEnv("PORT", "8080")
 
-	st := store.NewMemory()
+	st, err := store.OpenSQLite(getEnv("DB_PATH", "jobqueue.db"))
+	if err != nil {
+		log.Fatalf("cannot open database: %v", err)
+	}
+	defer st.Close()
 	srv := api.NewServer(st)
 
 	httpServer := &http.Server{
