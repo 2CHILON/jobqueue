@@ -74,11 +74,11 @@ type scanner interface {
 
 func scanJob(sc scanner) (*queue.Job, error) {
 	var (
-		j        queue.Job
-		payload  string
-		status   string
-		created  int64
-		updated  int64
+		j       queue.Job
+		payload string
+		status  string
+		created int64
+		updated int64
 	)
 	err := sc.Scan(&j.ID, &j.Type, &payload, &j.Priority, &status,
 		&j.Attempts, &j.MaxAttempts, &j.Result, &j.Error, &created, &updated)
