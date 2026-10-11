@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 
 jobqueue-server.exe
+build/
+installer/output/

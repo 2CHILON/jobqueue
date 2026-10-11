@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -29,11 +30,13 @@ func main() {
 
 	addr := ":" + getEnv("PORT", "8080")
 
-	st, err := store.OpenSQLite(getEnv("DB_PATH", "jobqueue.db"))
+	path := dbPath()
+	st, err := store.OpenSQLite(path)
 	if err != nil {
-		log.Fatalf("cannot open database: %v", err)
+		log.Fatalf("cannot open database %s: %v", path, err)
 	}
 	defer st.Close()
+	log.Printf("database: %s", path)
 	srv := api.NewServer(st)
 
 	httpServer := &http.Server{
@@ -72,4 +75,22 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// dbPath returns where the database file lives. DB_PATH wins if set;
+// otherwise a per-user folder (%AppData%\jobqueue on Windows), because the
+// install directory (Program Files) is not writable by normal users.
+func dbPath() string {
+	if v := os.Getenv("DB_PATH"); v != "" {
+		return filepath.ToSlash(v)
+	}
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "jobqueue.db"
+	}
+	dir = filepath.Join(dir, "jobqueue")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "jobqueue.db"
+	}
+	return filepath.ToSlash(filepath.Join(dir, "jobqueue.db"))
 }
