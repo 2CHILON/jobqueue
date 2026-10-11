@@ -4,12 +4,13 @@ on:
   push:
     tags: ["v*"]
 
-# Creating a release needs write access to repository contents.
+# Creating a release and uploading assets needs write access to repository contents.
 permissions:
   contents: write
 
 jobs:
   release:
+    name: Build and publish release
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -39,6 +40,13 @@ jobs:
           zip -j dist/jobqueue-worker.zip worker/worker.py worker/requirements.txt
           cd dist && sha256sum * > SHA256SUMS.txt
 
+      - name: Save Windows binary for the installer job
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binary
+          path: build/jobqueue-server.exe
+          retention-days: 1
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,3 +57,36 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
             $PRERELEASE
+
+  windows-installer:
+    name: Windows installer
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: build
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DAppVersion=$env:GITHUB_REF_NAME" installer\jobqueue.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Checksum and upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $file = "installer\output\jobqueue-setup_$env:GITHUB_REF_NAME.exe"
+          $name = Split-Path $file -Leaf
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "$file.sha256" -Value "$hash  $name" -Encoding ascii
+          gh release upload "$env:GITHUB_REF_NAME" $file "$file.sha256"
