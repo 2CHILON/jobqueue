@@ -1,0 +1,10 @@
+.git
+.github
+build/
+installer/
+*.exe
+*.db
+*.db-wal
+*.db-shm
+worker/.venv/
+**/__pycache__/

@@ -1,0 +1,28 @@
+name: jobqueue
+
+services:
+  server:
+    build:
+      context: .
+      args:
+        VERSION: dev
+    image: jobqueue-server:dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./worker
+    image: jobqueue-worker:dev
+    environment:
+      JOBQUEUE_URL: http://server:8080
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  data:

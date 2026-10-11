@@ -75,3 +75,38 @@ jobs:
 
       - name: Check the worker compiles
         run: python -m py_compile worker/worker.py
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait
+
+      - name: Smoke test
+        run: |
+          curl -fsS http://localhost:8080/health
+          id=$(curl -fsS -X POST http://localhost:8080/jobs \
+            -H 'Content-Type: application/json' \
+            -d '{"type":"word_count","payload":{"text":"ci smoke test"}}' \
+            | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+          for i in $(seq 1 20); do
+            status=$(curl -fsS http://localhost:8080/jobs/$id \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["status"])')
+            echo "job $id: $status"
+            if [ "$status" = "succeeded" ]; then exit 0; fi
+            sleep 1
+          done
+          echo "job did not succeed in time"
+          exit 1
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
